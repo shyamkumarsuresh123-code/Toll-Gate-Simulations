@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toll Gate Simulations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom animation for fading in */
+        .fade-in-up {
+            animation: fadeInUp 0.8s ease-out forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-white min-h-screen flex flex-col justify-between bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+
+    <div class="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
+    
+    <div class="fixed top-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
+    <div class="fixed bottom-0 right-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
+
+    <div class="container mx-auto px-4 py-16 flex-grow flex flex-col justify-center">
+        
+        <header class="text-center mb-16 fade-in-up">
+            <div class="inline-block p-2 px-4 rounded-full bg-slate-800 border border-slate-700 text-sm text-blue-400 font-semibold mb-4 tracking-wide uppercase">
+                Engineering Project
+            </div>
+            <h1 class="text-5xl md:text-6xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+                Toll Gate Simulations
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Explore the evolution of toll gate automation, from IR sensors to computer vision and renewable energy integration.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+
+            <a href="Phase 1 simulation/index.html" class="group relative fade-in-up delay-100">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl opacity-50 group-hover:opacity-100 transition duration-300 blur-sm group-hover:blur"></div>
+                <div class="relative h-full bg-slate-800 rounded-2xl p-8 border border-slate-700 hover:bg-slate-800/80 transition flex flex-col items-center text-center">
+                    <div class="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <i class="fa-solid fa-tower-broadcast text-3xl text-cyan-400"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors">Phase 1</h2>
+                    <h3 class="text-lg font-medium text-slate-200 mb-2">IR Sensor Counting</h3>
+                    <p class="text-slate-400 text-sm mb-6">Simulation of vehicle detection using basic Infrared sensors and logic gates.</p>
+                    <span class="mt-auto inline-flex items-center text-cyan-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Launch Simulation <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </span>
+                </div>
+            </a>
+
+            <a href="Phase 2 simulation/index.html" class="group relative fade-in-up delay-200">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl opacity-50 group-hover:opacity-100 transition duration-300 blur-sm group-hover:blur"></div>
+                <div class="relative h-full bg-slate-800 rounded-2xl p-8 border border-slate-700 hover:bg-slate-800/80 transition flex flex-col items-center text-center">
+                    <div class="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <i class="fa-solid fa-eye text-3xl text-purple-400"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-3 text-white group-hover:text-purple-400 transition-colors">Phase 2</h2>
+                    <h3 class="text-lg font-medium text-slate-200 mb-2">Computer Vision</h3>
+                    <p class="text-slate-400 text-sm mb-6">Advanced detection using camera feeds to identify and count specific vehicle types.</p>
+                    <span class="mt-auto inline-flex items-center text-purple-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Launch Simulation <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </span>
+                </div>
+            </a>
+
+            <a href="Phase 3 simulation/index.html" class="group relative fade-in-up delay-300">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl opacity-50 group-hover:opacity-100 transition duration-300 blur-sm group-hover:blur"></div>
+                <div class="relative h-full bg-slate-800 rounded-2xl p-8 border border-slate-700 hover:bg-slate-800/80 transition flex flex-col items-center text-center">
+                    <div class="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <i class="fa-solid fa-bolt text-3xl text-amber-400"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-3 text-white group-hover:text-amber-400 transition-colors">Phase 3</h2>
+                    <h3 class="text-lg font-medium text-slate-200 mb-2">Energy Generation</h3>
+                    <p class="text-slate-400 text-sm mb-6">Utilizing rotary speed breakers to harvest kinetic energy from moving traffic.</p>
+                    <span class="mt-auto inline-flex items-center text-amber-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Launch Simulation <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </span>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    <footer class="text-center py-6 text-slate-500 text-sm">
+        <p>&copy; 2024 Toll Gate Project. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>
