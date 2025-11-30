@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toll Gate IR Sensor Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            overflow-x: hidden;
+        }
+        canvas {
+            border-bottom: 4px solid #333;
+            border-top: 4px solid #333;
+            background-color: #3b3b3b; /* Asphalt color */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .sensor-led {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+        .led-off { background-color: #374151; box-shadow: inset 0 0 5px #000; }
+        .led-on { background-color: #ef4444; box-shadow: 0 0 10px #ef4444, inset 0 0 2px #fff; }
+        .led-active { background-color: #22c55e; box-shadow: 0 0 10px #22c55e, inset 0 0 2px #fff; } /* Green when detecting */
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen p-4">
+
+    <!-- Header -->
+    <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Toll Gate IR Sensor Simulation</h1>
+        <p class="text-gray-600">Visualizing Entry/Exit logic with Infrared Sensors</p>
+    </div>
+
+    <!-- Main Container -->
+    <div class="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- Left Panel: Visualization -->
+        <div class="w-full md:w-2/3 relative bg-gray-100 p-4 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-gray-200">
+            <!-- Canvas for Road -->
+            <div class="relative w-full overflow-hidden rounded-lg shadow-inner">
+                <canvas id="simCanvas"></canvas>
+                
+                <!-- Sensor Labels Overlay -->
+                <div class="absolute top-2 left-[20%] transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                    IR Sensor 1 (Entry)
+                </div>
+                <div class="absolute top-2 left-[80%] transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                    IR Sensor 2 (Exit)
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="mt-6 flex gap-4">
+                <button onclick="spawnCar()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition-colors active:scale-95 transform">
+                    Spawn Vehicle
+                </button>
+                <button id="autoBtn" onclick="toggleAuto()" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow transition-colors active:scale-95 transform">
+                    Start Auto-Mode
+                </button>
+                <button onclick="resetSim()" class="px-6 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg shadow transition-colors">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Data & Logic -->
+        <div class="w-full md:w-1/3 p-6 bg-gray-50 flex flex-col">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Logic Dashboard</h2>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 gap-4 mb-6">
+                <!-- Entry Count -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+                    <div class="text-xs text-gray-500 uppercase font-bold">Total Entered</div>
+                    <div id="entryCountDisplay" class="text-3xl font-mono font-bold text-gray-800">0</div>
+                    <div class="text-xs text-blue-500 mt-1">Sensor 1 Trigger Count</div>
+                </div>
+
+                <!-- Exit Count -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-500">
+                    <div class="text-xs text-gray-500 uppercase font-bold">Total Exited</div>
+                    <div id="exitCountDisplay" class="text-3xl font-mono font-bold text-gray-800">0</div>
+                    <div class="text-xs text-orange-500 mt-1">Sensor 2 Trigger Count</div>
+                </div>
+
+                <!-- Net Count -->
+                <div class="bg-green-50 p-4 rounded-lg shadow-sm border border-green-200">
+                    <div class="text-xs text-green-700 uppercase font-bold">Currently in Lane</div>
+                    <div id="netCountDisplay" class="text-4xl font-mono font-bold text-green-700">0</div>
+                    <div class="text-xs text-green-600 mt-1 font-mono">Formula: Entry - Exit</div>
+                </div>
+            </div>
+
+            <!-- Sensor Status -->
+            <div class="bg-gray-800 text-gray-200 p-4 rounded-lg font-mono text-sm">
+                <div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Hardware Status</div>
+                
+                <div class="flex items-center justify-between mb-2">
+                    <span>IR Sensor 1 (Entry):</span>
+                    <div class="flex items-center">
+                        <span id="led1" class="sensor-led led-off"></span>
+                        <span id="status1">CLEAR</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <span>IR Sensor 2 (Exit):</span>
+                    <div class="flex items-center">
+                        <span id="led2" class="sensor-led led-off"></span>
+                        <span id="status2">CLEAR</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Explanation -->
+    <div class="max-w-4xl mt-8 text-gray-600 text-sm bg-white p-6 rounded-lg shadow">
+        <h3 class="font-bold text-gray-800 mb-2">How it works:</h3>
+        <ul class="list-disc pl-5 space-y-1">
+            <li><strong>Entry Sensor (IR 1):</strong> Located at the start of the lane. When the IR beam is broken by a car, the <em>Total Entered</em> counter increases.</li>
+            <li><strong>Exit Sensor (IR 2):</strong> Located at the end. When a car passes this point, the <em>Total Exited</em> counter increases.</li>
+            <li><strong>Abstraction Logic:</strong> The system calculates vehicles inside the zone by subtracting exits from entries. <code>Current = Entered - Exited</code>.</li>
+        </ul>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Dimensions
+        canvas.width = 800; // Internal resolution width
+        canvas.height = 200; // Internal resolution height
+
+        // State Variables
+        let cars = [];
+        let totalEntered = 0;
+        let totalExited = 0;
+        let isAuto = false;
+        let autoInterval = null;
+        let animationId = null;
+
+        // Sensor Positions (X coordinates)
+        const SENSOR_1_X = 160; // 20% mark
+        const SENSOR_2_X = 640; // 80% mark
+        const SENSOR_WIDTH = 4; // Visual thickness of beam
+
+        // DOM Elements
+        const elEntry = document.getElementById('entryCountDisplay');
+        const elExit = document.getElementById('exitCountDisplay');
+        const elNet = document.getElementById('netCountDisplay');
+        const elLed1 = document.getElementById('led1');
+        const elLed2 = document.getElementById('led2');
+        const elStatus1 = document.getElementById('status1');
+        const elStatus2 = document.getElementById('status2');
+        const elAutoBtn = document.getElementById('autoBtn');
+
+        // Car Class
+        class Car {
+            constructor() {
+                this.width = 80;
+                this.height = 40;
+                this.x = -this.width - 20; // Start off-screen left
+                this.y = (canvas.height / 2) - (this.height / 2);
+                this.speed = 3 + Math.random() * 2; // Random speed between 3 and 5
+                this.color = this.getRandomColor();
+                
+                // Flags to ensure we only count once per sensor pass
+                this.triggeredEntry = false;
+                this.triggeredExit = false;
+            }
+
+            getRandomColor() {
+                const colors = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            update() {
+                this.x += this.speed;
+            }
+
+            draw() {
+                // Car Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Roof
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(this.x + 10, this.y + 5, this.width - 20, this.height - 10);
+                
+                // Headlights
+                ctx.fillStyle = '#fffaac';
+                ctx.fillRect(this.x + this.width - 5, this.y + 5, 5, 8);
+                ctx.fillRect(this.x + this.width - 5, this.y + this.height - 13, 5, 8);
+            }
+        }
+
+        // --- Logic Functions ---
+
+        function spawnCar() {
+            // Prevent spawning too close to another car
+            if (cars.length > 0) {
+                const lastCar = cars[cars.length - 1];
+                if (lastCar.x < 50) return; // Too close
+            }
+            cars.push(new Car());
+        }
+
+        function toggleAuto() {
+            isAuto = !isAuto;
+            if (isAuto) {
+                elAutoBtn.textContent = "Stop Auto-Mode";
+                elAutoBtn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+                elAutoBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                spawnCar();
+                autoInterval = setInterval(() => {
+                    // Random chance to spawn a car
+                    if (Math.random() > 0.3) spawnCar(); 
+                }, 1500);
+            } else {
+                elAutoBtn.textContent = "Start Auto-Mode";
+                elAutoBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                elAutoBtn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+                clearInterval(autoInterval);
+            }
+        }
+
+        function resetSim() {
+            cars = [];
+            totalEntered = 0;
+            totalExited = 0;
+            updateDashboard();
+            // Reset sensor visuals
+            updateSensorVisuals(false, false);
+        }
+
+        function updateDashboard() {
+            elEntry.innerText = totalEntered;
+            elExit.innerText = totalExited;
+            elNet.innerText = totalEntered - totalExited;
+        }
+
+        function updateSensorVisuals(s1Active, s2Active) {
+            // Sensor 1 UI
+            if (s1Active) {
+                elLed1.className = 'sensor-led led-active';
+                elStatus1.innerText = 'DETECTED';
+                elStatus1.style.color = '#22c55e';
+            } else {
+                elLed1.className = 'sensor-led led-off';
+                elStatus1.innerText = 'CLEAR';
+                elStatus1.style.color = '#9ca3af';
+            }
+
+            // Sensor 2 UI
+            if (s2Active) {
+                elLed2.className = 'sensor-led led-active';
+                elStatus2.innerText = 'DETECTED';
+                elStatus2.style.color = '#22c55e';
+            } else {
+                elLed2.className = 'sensor-led led-off';
+                elStatus2.innerText = 'CLEAR';
+                elStatus2.style.color = '#9ca3af';
+            }
+        }
+
+        // --- Game Loop ---
+
+        function loop() {
+            // Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Road Markings
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#ffffff';
+            
+            // Dashed center line
+            ctx.beginPath();
+            ctx.setLineDash([20, 20]);
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+
+            // 2. Logic Check: Sensors
+            let sensor1Triggered = false;
+            let sensor2Triggered = false;
+
+            // Check every car against sensors
+            cars.forEach(car => {
+                // Car boundaries
+                const carLeft = car.x;
+                const carRight = car.x + car.width;
+
+                // Sensor 1 Logic (Entry)
+                // If car is overlapping the sensor line
+                if (carRight >= SENSOR_1_X && carLeft <= SENSOR_1_X) {
+                    sensor1Triggered = true;
+                    if (!car.triggeredEntry) {
+                        totalEntered++;
+                        car.triggeredEntry = true;
+                        updateDashboard();
+                    }
+                }
+
+                // Sensor 2 Logic (Exit)
+                if (carRight >= SENSOR_2_X && carLeft <= SENSOR_2_X) {
+                    sensor2Triggered = true;
+                    if (!car.triggeredExit) {
+                        totalExited++;
+                        car.triggeredExit = true;
+                        updateDashboard();
+                    }
+                }
+            });
+
+            // Update Sensor Visuals based on current frame state
+            updateSensorVisuals(sensor1Triggered, sensor2Triggered);
+
+            // 3. Draw Sensors (Under cars)
+            // Sensor 1 Line
+            ctx.fillStyle = sensor1Triggered ? '#22c55e' : '#ef4444'; // Green if active, Red if idle
+            ctx.shadowBlur = sensor1Triggered ? 15 : 0;
+            ctx.shadowColor = '#22c55e';
+            ctx.fillRect(SENSOR_1_X, 0, SENSOR_WIDTH, canvas.height);
+            ctx.shadowBlur = 0; // Reset shadow
+
+            // Sensor 2 Line
+            ctx.fillStyle = sensor2Triggered ? '#22c55e' : '#ef4444';
+            ctx.shadowBlur = sensor2Triggered ? 15 : 0;
+            ctx.shadowColor = '#22c55e';
+            ctx.fillRect(SENSOR_2_X, 0, SENSOR_WIDTH, canvas.height);
+            ctx.shadowBlur = 0;
+
+            // 4. Update and Draw Cars
+            for (let i = cars.length - 1; i >= 0; i--) {
+                cars[i].update();
+                cars[i].draw();
+
+                // Remove car if it goes off screen
+                if (cars[i].x > canvas.width) {
+                    cars.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // Start Loop
+        loop();
+
+        // Responsive Canvas Sizing (Simple CSS scale handled by browser, internal res fixed)
+    </script>
+</body>
+</html>

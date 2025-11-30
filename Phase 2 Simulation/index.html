@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toll Gate Traffic Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap');
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #0f172a; 
+            font-family: 'Inter', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+        }
+
+        /* --- DASHBOARD STYLES --- */
+        #dashboard {
+            background: #1e293b;
+            border-bottom: 4px solid #334155;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            z-index: 50;
+            flex-shrink: 0;
+            min-height: 140px;
+        }
+
+        .panel {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .digital-display {
+            font-family: 'JetBrains Mono', monospace;
+            background: #000;
+            color: #4ade80;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #14532d;
+            box-shadow: inset 0 0 5px rgba(74, 222, 128, 0.2);
+            text-align: right;
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        /* --- SIMULATION STYLES --- */
+        #sim-container {
+            flex-grow: 1;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+        
+        canvas {
+            display: block;
+        }
+
+        .toggle-checkbox:checked { right: 0; border-color: #2563EB; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #2563EB; }
+        
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .processing-text { color: #facc15; animation: blink 0.5s infinite; }
+    </style>
+</head>
+<body>
+
+    <!-- DASHBOARD -->
+    <header id="dashboard">
+        
+        <!-- Metrics -->
+        <div class="flex gap-4 h-full">
+            <div class="panel min-w-[140px]">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="stat-label">Total Count</span>
+                    <i class="fas fa-camera text-gray-600 text-xs"></i>
+                </div>
+                <div id="counterDisplay" class="digital-display">0000</div>
+            </div>
+
+            <div class="panel min-w-[120px]">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="stat-label">Queue Load</span>
+                    <i class="fas fa-car-side text-gray-600 text-xs"></i>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <div id="occupancyDisplay" class="text-2xl font-bold text-blue-400 font-mono">0</div>
+                    <span class="text-xs text-gray-500">vehs</span>
+                </div>
+                <div class="w-full bg-gray-800 h-1 mt-2 rounded overflow-hidden">
+                    <div id="occupancyBar" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="panel flex-row gap-6 items-center border-blue-900/30 bg-blue-900/5">
+            
+            <div class="flex flex-col items-center mr-4">
+                <span class="stat-label mb-2">Mode</span>
+                <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="modeToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 left-0 transition-all duration-300" onclick="toggleMode()"/>
+                    <label for="modeToggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-700 cursor-pointer"></label>
+                </div>
+                <div id="modeText" class="text-[10px] mt-1 font-bold text-gray-400">AUTO</div>
+            </div>
+
+            <div class="flex gap-2">
+                <button id="btnOpen" onclick="manualOpen()" class="flex flex-col items-center justify-center w-20 h-16 bg-green-900 hover:bg-green-800 border border-green-700 rounded transition active:scale-95">
+                    <i class="fas fa-arrow-up text-green-400 mb-1"></i>
+                    <span class="text-[10px] font-bold text-green-100">OPEN</span>
+                </button>
+                <button id="btnClose" onclick="manualClose()" class="flex flex-col items-center justify-center w-20 h-16 bg-red-900 hover:bg-red-800 border border-red-700 rounded transition active:scale-95">
+                    <i class="fas fa-arrow-down text-red-400 mb-1"></i>
+                    <span class="text-[10px] font-bold text-red-100">CLOSE</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col items-center justify-center bg-black/40 rounded p-2 min-w-[100px] border border-gray-700">
+                <span class="text-[10px] text-gray-500 font-bold tracking-widest mb-1">STATUS</span>
+                <span id="gateStatus" class="text-sm font-bold text-red-500 tracking-wider">CLOSED</span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-col gap-2 h-full justify-center">
+            <button onclick="spawnCar()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded border border-slate-600 transition flex items-center gap-2">
+                <i class="fas fa-plus"></i> ADD VEHICLE
+            </button>
+            <button onclick="resetSim()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-red-400 text-xs font-bold rounded border border-slate-700 transition flex items-center gap-2">
+                <i class="fas fa-redo"></i> RESET SIM
+            </button>
+        </div>
+
+    </header>
+
+    <main id="sim-container">
+        <canvas id="simCanvas"></canvas>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const container = document.getElementById('sim-container');
+        const ctx = canvas.getContext('2d');
+
+        // Elements
+        const elCounter = document.getElementById('counterDisplay');
+        const elOccupancy = document.getElementById('occupancyDisplay');
+        const elOccupancyBar = document.getElementById('occupancyBar');
+        const elGateStatus = document.getElementById('gateStatus');
+        const elModeText = document.getElementById('modeText');
+        const elModeToggle = document.getElementById('modeToggle');
+
+        // Config
+        const LANE_WIDTH = 140;
+        const CAR_WIDTH = 80;
+        const CAR_HEIGHT = 44;
+        const STOP_LINE_OFFSET = 30; // Distance before gate to stop
+        const PROCESSING_TIME = 800; // ms
+        
+        // Sim State
+        let vehicles = [];
+        let totalCount = 0;
+        let isManualMode = false;
+        let roadY = 0;
+        let gateX = 0;
+        let cameraX = 0;
+        let processingCarId = null; // Track which car is currently paying
+
+        const gate = {
+            state: 'CLOSED',
+            angle: 0,
+            timer: 0
+        };
+
+        const camera = {
+            flashIntensity: 0
+        };
+
+        function init() {
+            window.addEventListener('resize', resize);
+            resize();
+            resetSim();
+            requestAnimationFrame(loop);
+        }
+
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            roadY = canvas.height / 2;
+            gateX = canvas.width * 0.75;
+            cameraX = canvas.width * 0.45;
+        }
+
+        function resetSim() {
+            vehicles = [];
+            totalCount = 0;
+            processingCarId = null;
+            updateMetrics();
+            gate.state = 'CLOSED';
+            gate.angle = 0;
+            // Spawn initial traffic
+            for(let i=0; i<4; i++) spawnCar(-100 - (i*150));
+        }
+
+        function toggleMode() {
+            isManualMode = elModeToggle.checked;
+            elModeText.innerText = isManualMode ? "MANUAL" : "AUTO";
+            elModeText.className = isManualMode ? "text-[10px] mt-1 font-bold text-blue-400" : "text-[10px] mt-1 font-bold text-gray-400";
+            processingCarId = null; // Reset processing on mode switch
+        }
+
+        function spawnCar(startX = null) {
+            if (startX === null) {
+                // Calculate position behind the last car
+                const minX = vehicles.length > 0 ? Math.min(...vehicles.map(v => v.x)) : -50;
+                startX = Math.min(-150, minX - (CAR_WIDTH + 60));
+            }
+
+            vehicles.push({
+                id: Math.random().toString(36).substr(2, 9),
+                x: startX,
+                y: 0,
+                speed: 0,
+                maxSpeed: 4 + Math.random(),
+                color: getRandomColor(),
+                state: 'MOVING',
+                paid: false,
+                counted: false
+            });
+            updateMetrics();
+        }
+
+        function getRandomColor() {
+            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#cbd5e1'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function manualOpen() { if (gate.state !== 'OPEN') gate.state = 'OPENING'; }
+        function manualClose() { if (gate.state !== 'CLOSED') gate.state = 'CLOSING'; }
+
+        // --- CORE LOGIC LOOP ---
+        function update() {
+            // 1. Gate Animation
+            if (gate.state === 'OPENING') {
+                gate.angle -= 0.08;
+                if (gate.angle <= -Math.PI/2) {
+                    gate.angle = -Math.PI/2;
+                    gate.state = 'OPEN';
+                }
+            } else if (gate.state === 'CLOSING') {
+                gate.angle += 0.08;
+                if (gate.angle >= 0) {
+                    gate.angle = 0;
+                    gate.state = 'CLOSED';
+                }
+            }
+
+            // 2. Camera Effect
+            if (camera.flashIntensity > 0) camera.flashIntensity -= 0.05;
+
+            // 3. Sort vehicles by position (Descending X: Closest to exit first)
+            vehicles.sort((a, b) => b.x - a.x);
+
+            // 4. AUTO CLOSE LOGIC
+            // In Auto mode, we must close the gate immediately after a car passes to stop the NEXT car.
+            if (!isManualMode && gate.state === 'OPEN') {
+                // Determine if the "paid" car has cleared the gate arm area
+                // Gate arm is roughly at gateX. Car needs to be fully past.
+                const clearedCars = vehicles.filter(v => v.x > gateX + 20);
+                
+                // If there is a car that just cleared it, and no car is *currently* blocking the arm
+                const blockingCar = vehicles.some(v => v.x < gateX + 20 && v.x + CAR_WIDTH > gateX - 20);
+                
+                if (!blockingCar && clearedCars.length > 0) {
+                    // Safety check: Don't close if the next car is already too close to stop
+                    // Find the closest approaching car
+                    const approaching = vehicles.filter(v => v.x < gateX);
+                    if (approaching.length === 0) {
+                        // No cars coming, close it
+                        gate.state = 'CLOSING';
+                    } else {
+                        const nextCar = approaching[0]; // Closest one because we sorted
+                        // Only close if next car is far enough back to see the red light
+                        // OR if we just want to enforce "One at a time" rigidly
+                        if (nextCar.x < gateX - 50) {
+                            gate.state = 'CLOSING';
+                        }
+                    }
+                }
+            }
+
+            // 5. VEHICLE LOOP
+            vehicles.forEach((car, index) => {
+                let targetX = Infinity;
+
+                // --- MOVEMENT TARGETS ---
+                
+                // Obstacle 1: The Car in Front
+                if (index > 0) {
+                    const leadCar = vehicles[index - 1];
+                    targetX = leadCar.x - CAR_WIDTH - 25; // 25px gap
+                }
+
+                // Obstacle 2: The Gate (Only if lead car or no car immediately in front)
+                // If the car in front is past the gate, this car is now looking at the gate
+                const stopLine = gateX - CAR_WIDTH - STOP_LINE_OFFSET;
+                
+                // If gate is not OPEN, we must stop at the line
+                // BUT only if we haven't already passed it
+                if (gate.state !== 'OPEN' && car.x < stopLine + 10) { 
+                    // +10 allows for slight overshoots to be corrected
+                    if (targetX > stopLine) {
+                        targetX = stopLine;
+                    }
+                }
+
+                // --- PHYSICS ---
+                if (car.x < targetX) {
+                    // Accelerate
+                    if (car.speed < car.maxSpeed) car.speed += 0.2;
+                    
+                    // Decelerate for target
+                    const dist = targetX - car.x;
+                    if (dist < 150) {
+                        car.speed *= 0.85; // Brake
+                        if (dist < 2) {
+                            car.x = targetX;
+                            car.speed = 0;
+                        }
+                    }
+                } else if (car.x > targetX) {
+                    // Adjust if pushed back (rare in this linear logic but good for safety)
+                    car.x = targetX; 
+                    car.speed = 0;
+                }
+
+                car.x += car.speed;
+                car.state = (car.speed < 0.1) ? 'STOPPED' : 'MOVING';
+
+                // --- PAYMENT LOGIC (AUTO MODE) ---
+                // Trigger if: Auto Mode AND Car Stopped at Line AND Gate Closed AND Not Paid
+                if (!isManualMode && 
+                    car.state === 'STOPPED' && 
+                    !car.paid && 
+                    gate.state === 'CLOSED' && 
+                    Math.abs(car.x - stopLine) < 5 && // Accurately at the line
+                    processingCarId !== car.id) { // Not already processing this specific car
+                    
+                    processingCarId = car.id;
+                    gate.state = 'PROCESSING';
+                    
+                    setTimeout(() => {
+                        car.paid = true;
+                        gate.state = 'OPENING';
+                        processingCarId = null; // Release lock
+                    }, PROCESSING_TIME);
+                }
+
+                // --- CAMERA LOGIC ---
+                // Trigger line is before the gate
+                const triggerPoint = cameraX - 50;
+                if (!car.counted && car.x > triggerPoint) {
+                    car.counted = true;
+                    totalCount++;
+                    camera.flashIntensity = 1;
+                    updateMetrics();
+                }
+            });
+
+            // Cleanup
+            vehicles = vehicles.filter(v => v.x < canvas.width + 200);
+            updateMetrics();
+        }
+
+        function updateMetrics() {
+            elCounter.innerText = totalCount.toString().padStart(4, '0');
+            elOccupancy.innerText = vehicles.length;
+            
+            let st = "CLOSED"; 
+            let cl = "text-red-500";
+            
+            if (gate.state === 'OPEN') { st = "OPEN"; cl = "text-green-500"; }
+            if (gate.state === 'OPENING') { st = "OPENING"; cl = "text-green-300"; }
+            if (gate.state === 'CLOSING') { st = "CLOSING"; cl = "text-orange-500"; }
+            if (gate.state === 'PROCESSING') { st = "PAYING..."; cl = "processing-text"; }
+
+            elGateStatus.innerText = st;
+            elGateStatus.className = `text-sm font-bold tracking-wider ${cl}`;
+
+            const pct = Math.min((vehicles.length / 10) * 100, 100);
+            elOccupancyBar.style.width = `${pct}%`;
+        }
+
+        // --- DRAWING ---
+        function loop() {
+            // Background
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid();
+            drawRoad();
+            drawGate(); // Booth & Island
+            
+            // Cars
+            vehicles.forEach(drawCar);
+            
+            drawGateArm(); // Arm over cars
+            drawGantry(); // Camera over everything
+
+            requestAnimationFrame(() => {
+                update();
+                loop();
+            });
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            const offset = (Date.now() / 40) % 40;
+            for(let x=-offset; x<canvas.width; x+=40) {
+                ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+            }
+        }
+
+        function drawRoad() {
+            const y = roadY;
+            const h = LANE_WIDTH/2;
+            
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(0, y-h, canvas.width, LANE_WIDTH);
+            
+            ctx.strokeStyle = '#9ca3af';
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(0, y-h); ctx.lineTo(canvas.width, y-h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, y+h); ctx.lineTo(canvas.width, y+h); ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.setLineDash([20,20]);
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawCar(car) {
+            const x = car.x;
+            const y = roadY - CAR_HEIGHT/2;
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(x+5, y+5, CAR_WIDTH, CAR_HEIGHT);
+            
+            // Body
+            ctx.fillStyle = car.color;
+            ctx.beginPath(); ctx.roundRect(x, y, CAR_WIDTH, CAR_HEIGHT, 6); ctx.fill();
+            
+            // Windshield
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(x+CAR_WIDTH-25, y+4, 15, CAR_HEIGHT-8);
+            
+            // Lights
+            ctx.fillStyle = (car.state === 'STOPPED') ? '#ff0000' : '#7f1d1d';
+            if(car.state === 'STOPPED') { ctx.shadowColor='red'; ctx.shadowBlur=10; }
+            ctx.fillRect(x, y+4, 3, 8);
+            ctx.fillRect(x, y+CAR_HEIGHT-12, 3, 8);
+            ctx.shadowBlur=0;
+            
+            ctx.fillStyle = '#fef3c7';
+            ctx.fillRect(x+CAR_WIDTH-2, y+4, 2, 8);
+            ctx.fillRect(x+CAR_WIDTH-2, y+CAR_HEIGHT-12, 2, 8);
+        }
+
+        function drawGate() {
+            ctx.fillStyle = '#374151';
+            ctx.beginPath(); ctx.roundRect(gateX-20, roadY-LANE_WIDTH/2-60, 40, 60, 4); ctx.fill();
+            
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillRect(gateX-15, roadY-LANE_WIDTH/2-50, 30, 40);
+            
+            // Stop Line
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.moveTo(gateX, roadY-LANE_WIDTH/2); ctx.lineTo(gateX, roadY+LANE_WIDTH/2); ctx.stroke();
+        }
+
+        function drawGateArm() {
+            ctx.save();
+            ctx.translate(gateX, roadY-LANE_WIDTH/2);
+            ctx.rotate(gate.angle);
+            ctx.fillStyle = '#f3f4f6';
+            ctx.fillRect(-5, -5, 10, LANE_WIDTH+10);
+            ctx.fillStyle = '#ef4444';
+            for(let i=10; i<LANE_WIDTH; i+=20) ctx.fillRect(-5, i, 10, 10);
+            ctx.restore();
+        }
+
+        function drawGantry() {
+            const bx = cameraX;
+            const top = roadY-LANE_WIDTH/2-50;
+            
+            // Supports
+            ctx.fillStyle = '#4b5563';
+            ctx.fillRect(bx, top, 15, LANE_WIDTH+100);
+            
+            // Camera
+            ctx.fillStyle = '#000';
+            ctx.fillRect(bx-10, roadY-10, 20, 20);
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath(); ctx.arc(bx-10, roadY, 6, 0, Math.PI*2); ctx.fill();
+            
+            // Flash
+            if(camera.flashIntensity > 0) {
+                ctx.save();
+                ctx.translate(bx-10, roadY);
+                const g = ctx.createLinearGradient(0,0,-200,0);
+                g.addColorStop(0, `rgba(255,255,255,${camera.flashIntensity})`);
+                g.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle=g;
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-200, -60); ctx.lineTo(-200, 60); ctx.fill();
+                ctx.restore();
+            }
+            
+            // Trigger Line
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(bx - 50, roadY - LANE_WIDTH/2);
+            ctx.lineTo(bx - 50, roadY + LANE_WIDTH/2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        init();
+    </script>
+</body>
+</html>

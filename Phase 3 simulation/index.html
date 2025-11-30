@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Speed Breaker Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; background: #f3f4f6; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Top Layout */
+        .top-panel {
+            display: grid;
+            grid-template-columns: 350px 1fr; /* Fixed width controls, rest for data */
+            gap: 20px;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        .section-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .control-group { margin-bottom: 15px; }
+        .control-label { display: block; font-weight: 700; color: #334155; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+        button:active { transform: scale(0.96); }
+
+        /* Mechanism Buttons */
+        .btn-mode { background: #e2e8f0; color: #64748b; }
+        .btn-mode.active { background: #2563eb; color: white; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4); }
+        
+        /* Spawn Buttons */
+        .btn-spawn-car { 
+            background: linear-gradient(135deg, #10b981, #059669); 
+            color: white; 
+            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        }
+        .btn-spawn-truck { 
+            background: linear-gradient(135deg, #f59e0b, #d97706); 
+            color: white;
+            box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+        }
+
+        /* Reset Button */
+        .btn-reset {
+            background: transparent;
+            color: #ef4444;
+            border: 1px solid #fca5a5;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+        }
+        .btn-reset:hover { background: #fef2f2; }
+
+        /* Data Display */
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 100%; }
+        .data-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .data-card.active-reading { border-left-color: #2563eb; }
+        .data-card.power { border-left-color: #f59e0b; }
+        
+        .data-val { font-size: 1.8rem; font-weight: 800; color: #1e293b; font-variant-numeric: tabular-nums; }
+        .data-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 600; margin-top: 4px; }
+
+        /* Simulation Area */
+        #sim-container {
+            flex-grow: 1;
+            position: relative;
+            background: #374151;
+            overflow: hidden;
+            border-top: 4px solid #1f2937;
+        }
+        
+        canvas { display: block; width: 100%; height: 100%; outline: none; }
+
+        .mech-desc {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #f1f5f9;
+            padding: 8px 24px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Top Panel: Controls & Data -->
+    <div class="top-panel">
+        
+        <!-- Controls -->
+        <div class="section-box">
+            <div class="control-group">
+                <span class="control-label">1. Select Mechanism</span>
+                <div class="btn-grid">
+                    <button id="btnRack" class="btn-mode active">Rack & Pinion</button>
+                    <button id="btnRotary" class="btn-mode">Rotatory Roller</button>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-bottom: 0;">
+                <span class="control-label">2. Spawn Traffic</span>
+                <div class="btn-grid">
+                    <button id="btnSpawnCar" class="btn-spawn-car">
+                        <span>🚗</span> Car
+                    </button>
+                    <button id="btnSpawnTruck" class="btn-spawn-truck">
+                        <span>🚚</span> Truck
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Dashboard -->
+        <div class="section-box">
+            <div class="data-header">
+                <span class="control-label" style="margin:0;">Live Metrics</span>
+                <button id="btnReset" class="btn-reset">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Reset Data
+                </button>
+            </div>
+            
+            <div class="data-grid">
+                <div class="data-card active-reading">
+                    <div class="data-val"><span id="valVoltage">0.0</span> <span style="font-size: 1rem;">V</span></div>
+                    <div class="data-label">Voltage Output</div>
+                </div>
+                <div class="data-card power">
+                    <div class="data-val"><span id="valEnergy">0.00</span> <span style="font-size: 1rem;">J</span></div>
+                    <div class="data-label">Total Energy</div>
+                </div>
+                <div class="data-card">
+                    <div class="data-val" id="valWeight">0</div>
+                    <div class="data-label">Load (Tons)</div>
+                </div>
+                <div class="data-card">
+                    <div class="data-val" id="valRPM">0</div>
+                    <div class="data-label">Mechanism RPM</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Simulation Canvas -->
+    <div id="sim-container">
+        <canvas id="simCanvas"></canvas>
+        <div class="mech-desc" id="mechDesc">Mode: Rack & Pinion (Vertical Displacement)</div>
+    </div>
+
+<script>
+    // --- 1. Setup & Constants ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('sim-container');
+
+    // Button Elements
+    const btnRack = document.getElementById('btnRack');
+    const btnRotary = document.getElementById('btnRotary');
+    const btnSpawnCar = document.getElementById('btnSpawnCar');
+    const btnSpawnTruck = document.getElementById('btnSpawnTruck');
+    const btnReset = document.getElementById('btnReset');
+
+    // Data Elements
+    const valVoltage = document.getElementById('valVoltage');
+    const valEnergy = document.getElementById('valEnergy');
+    const valWeight = document.getElementById('valWeight');
+    const valRPM = document.getElementById('valRPM');
+    const mechDesc = document.getElementById('mechDesc');
+
+    // Physics Settings
+    const GROUND_Y_OFFSET = 180;
+    const RACK_WIDTH = 100;
+    const RACK_MAX_DISP = 50;
+    
+    // State
+    let mechanismType = 'rack'; // 'rack' or 'rotary'
+    let vehicles = [];
+    let totalEnergy = 0;
+    let groundY, centerX;
+    
+    // Mechanics State
+    let mechState = {
+        rackDisp: 0,
+        rackVelocity: 0,
+        rollerAngle: 0,
+        gearAngle: 0,
+        genRPM: 0
+    };
+
+    // --- 2. Event Listeners ---
+    
+    function resize() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        groundY = canvas.height - GROUND_Y_OFFSET;
+        centerX = canvas.width / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    btnRack.addEventListener('click', () => {
+        mechanismType = 'rack';
+        btnRack.classList.add('active');
+        btnRotary.classList.remove('active');
+        mechDesc.innerText = "Mode: Rack & Pinion (Downwards Force → Rotary Motion)";
+        mechState.rackDisp = 0;
+    });
+
+    btnRotary.addEventListener('click', () => {
+        mechanismType = 'rotary';
+        btnRotary.classList.add('active');
+        btnRack.classList.remove('active');
+        mechDesc.innerText = "Mode: Rotatory Roller (Tire Friction → Rotary Motion)";
+        mechState.rackDisp = 0;
+    });
+
+    btnSpawnCar.addEventListener('click', () => spawnVehicle('car'));
+    btnSpawnTruck.addEventListener('click', () => spawnVehicle('truck'));
+
+    btnReset.addEventListener('click', () => {
+        totalEnergy = 0;
+        vehicles = []; // Clear cars
+        mechState.genRPM = 0;
+        mechState.rackVelocity = 0;
+        mechState.rackDisp = 0;
+        // Visual feedback
+        btnReset.innerText = "Reset!";
+        setTimeout(() => btnReset.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Reset Data', 1000);
+    });
+
+    // --- 3. Classes & Functions ---
+
+    class Vehicle {
+        constructor(type) {
+            this.type = type;
+            this.x = -300; // Start off screen left
+            
+            if (type === 'truck') {
+                this.width = 240;
+                this.height = 90;
+                this.weight = 8.0; // Heavy
+                this.speed = 3.5;    // Slow
+                this.color = '#d97706';
+                this.wheelRadius = 28;
+                this.wheels = [40, 80, this.width - 40]; // Wheel x-offsets
+            } else {
+                this.width = 120;
+                this.height = 50;
+                this.weight = 1.5; // Light
+                this.speed = 6.0;  // Fast
+                this.color = '#ef4444';
+                this.wheelRadius = 20;
+                this.wheels = [30, this.width - 30];
+            }
+            
+            this.y = groundY - this.wheelRadius;
+        }
+
+        update() {
+            this.x += this.speed;
+        }
+
+        draw(ctx) {
+            // Draw Body
+            ctx.fillStyle = this.color;
+            
+            if (this.type === 'truck') {
+                // Trailer
+                ctx.fillRect(this.x, this.y - this.height, this.width - 60, this.height);
+                // Cab
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(this.x + this.width - 60, this.y - this.height + 20, 60, this.height - 20);
+                // Window
+                ctx.fillStyle = '#bae6fd';
+                ctx.fillRect(this.x + this.width - 25, this.y - this.height + 30, 20, 25);
+            } else {
+                // Car Body
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y - 35, this.width, 35, 8);
+                ctx.fill();
+                // Car Top
+                ctx.fillStyle = '#991b1b'; 
+                ctx.beginPath();
+                ctx.moveTo(this.x + 25, this.y - 35);
+                ctx.lineTo(this.x + 40, this.y - 55);
+                ctx.lineTo(this.x + this.width - 40, this.y - 55);
+                ctx.lineTo(this.x + this.width - 25, this.y - 35);
+                ctx.fill();
+            }
+
+            // Draw Wheels
+            ctx.fillStyle = '#1e293b';
+            this.wheels.forEach(offset => {
+                const wx = this.x + offset;
+                const wy = this.y; // Centered on ground line visually
+                
+                ctx.beginPath();
+                ctx.arc(wx, wy, this.wheelRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                
+                // Rim Animation
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(wx, wy, this.wheelRadius * 0.6, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.save();
+                ctx.translate(wx, wy);
+                ctx.rotate(this.x * 0.15); // Rotation based on distance
+                ctx.beginPath();
+                ctx.moveTo(-this.wheelRadius + 5, 0);
+                ctx.lineTo(this.wheelRadius - 5, 0);
+                ctx.moveTo(0, -this.wheelRadius + 5);
+                ctx.lineTo(0, this.wheelRadius - 5);
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+    }
+
+    function spawnVehicle(type) {
+        // Simple collision prevention at spawn
+        const lastVehicle = vehicles[vehicles.length - 1];
+        if (lastVehicle && lastVehicle.x < 50) {
+            // Don't spawn if start area is blocked
+            return;
+        }
+        vehicles.push(new Vehicle(type));
+    }
+
+    function drawGear(x, y, radius, teeth, angle, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = color;
+        
+        // Teeth
+        ctx.beginPath();
+        for (let i = 0; i < teeth * 2; i++) {
+            const a = (Math.PI * 2 * i) / (teeth * 2);
+            const r = (i % 2 === 0) ? radius : radius - (radius * 0.2);
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Inner Hole
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = '#333'; // Dark axle
+        ctx.fill();
+        
+        // Detail
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    // --- 4. Physics Engine ---
+
+    function updatePhysics() {
+        let activeLoad = 0;
+        let vehicleVelocity = 0;
+        let isEngaged = false;
+
+        // Breaker Area
+        const breakerStart = centerX - RACK_WIDTH/2 - 20;
+        const breakerEnd = centerX + RACK_WIDTH/2 + 20;
+
+        vehicles.forEach(v => {
+            // Check every wheel
+            let wheelOnBreaker = false;
+            v.wheels.forEach(offset => {
+                const wx = v.x + offset;
+                if (wx > breakerStart && wx < breakerEnd) {
+                    wheelOnBreaker = true;
+                }
+            });
+
+            if (wheelOnBreaker) {
+                activeLoad = Math.max(activeLoad, v.weight);
+                vehicleVelocity = v.speed;
+                isEngaged = true;
+            }
+        });
+
+        // Current Outputs
+        let voltage = 0;
+
+        if (mechanismType === 'rack') {
+            // Rack Physics: Spring-Mass-Damper simplified
+            // Target Y is pressed down (Max Disp) if loaded, else 0
+            const target = isEngaged ? RACK_MAX_DISP : 0;
+            const k = 0.1; // Spring stiffness
+            const damping = 0.85; // Damping
+            
+            // Accelerate towards target
+            const force = (target - mechState.rackDisp) * k;
+            mechState.rackVelocity += force;
+            mechState.rackVelocity *= damping; // Apply drag
+            mechState.rackDisp += mechState.rackVelocity;
+
+            // Generate voltage from Rack Velocity
+            // V = B * L * v (Velocity matters)
+            voltage = Math.abs(mechState.rackVelocity) * 15;
+            
+            // Gear rotation tied to linear rack movement
+            // dTheta = dy / radius
+            mechState.gearAngle += mechState.rackVelocity * 0.15;
+            mechState.genRPM = Math.abs(mechState.rackVelocity * 100);
+
+        } else {
+            // Rotary Physics
+            // Roller accelerates if vehicle passes over
+            if (isEngaged) {
+                // Torque = Force * radius. Force proportional to weight.
+                // Target RPM proportional to vehicle speed
+                const targetRPM = vehicleVelocity * 10;
+                // Heavier vehicles spin it up faster (more friction/traction)
+                const spinUpRate = 0.05 * activeLoad; 
+                
+                mechState.genRPM += (targetRPM - mechState.genRPM) * spinUpRate;
+            } else {
+                // Free spin decay
+                mechState.genRPM *= 0.96;
+            }
+
+            // Update angles
+            const speedRad = mechState.genRPM * 0.05; // Scaling factor
+            mechState.rollerAngle += speedRad;
+            mechState.gearAngle += speedRad * 2; // Gear ratio
+            
+            // Voltage from RPM
+            voltage = Math.abs(mechState.genRPM) * 0.8;
+        }
+
+        // Energy Integration
+        if (voltage > 0.1) {
+            totalEnergy += voltage * 0.016; // dt approx
+        }
+
+        return { voltage, activeLoad, rpm: mechState.genRPM };
+    }
+
+    // --- 5. Render Loop ---
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const physics = updatePhysics();
+
+        // -- Underground Pit --
+        ctx.fillStyle = '#1e1e24';
+        const pitY = groundY + 5;
+        ctx.fillRect(centerX - 80, pitY, 160, 160);
+
+        // -- Mechanism Drawing --
+
+        if (mechanismType === 'rack') {
+            const rackTop = groundY - RACK_MAX_DISP + mechState.rackDisp;
+            
+            // 1. The Rack Column
+            ctx.fillStyle = '#cbd5e1';
+            const rackX = centerX;
+            ctx.fillRect(rackX - 10, rackTop, 20, 150);
+            
+            // Teeth
+            ctx.fillStyle = '#475569';
+            for(let i=0; i<8; i++) {
+                ctx.fillRect(rackX, rackTop + 20 + (i*14), 12, 6);
+            }
+
+            // 2. The Pinion Gear
+            const gearX = rackX + 10 + 35; // offset + radius
+            const gearY = pitY + 60;
+            drawGear(gearX, gearY, 35, 12, mechState.gearAngle, '#fbbf24');
+
+            // 3. Generator Box
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(gearX + 35, gearY - 20, 50, 40);
+            
+            // 4. The Speed Breaker Cap
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 50, groundY); // Base Left
+            ctx.lineTo(centerX - 40, rackTop); // Top Left
+            ctx.lineTo(centerX + 40, rackTop); // Top Right
+            ctx.lineTo(centerX + 50, groundY); // Base Right
+            ctx.fill();
+            
+            // Stripes
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 15, rackTop);
+            ctx.lineTo(centerX - 25, groundY);
+            ctx.lineTo(centerX - 15, groundY);
+            ctx.lineTo(centerX - 5, rackTop);
+            ctx.fill();
+
+        } else {
+            // Rotary Roller
+            const rollerRadius = 40;
+            const rollerY = groundY + 15;
+            
+            // 1. The Roller
+            ctx.save();
+            // Clip to ground mostly, but stick out a bit
+            ctx.beginPath();
+            ctx.rect(0, 0, canvas.width, canvas.height);
+            // ctx.clip(); // Actually let's just draw it
+            
+            ctx.translate(centerX, rollerY);
+            ctx.rotate(mechState.rollerAngle);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, rollerRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#64748b';
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#334155';
+            ctx.stroke();
+            
+            // Texture
+            ctx.fillStyle = '#facc15';
+            for(let i=0; i<6; i++) {
+                ctx.rotate(Math.PI / 3);
+                ctx.fillRect(20, -4, 15, 8);
+            }
+            ctx.restore();
+
+            // 2. Belt Drive
+            const genX = centerX + 90;
+            const genY = pitY + 80;
+            
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(centerX + 20, rollerY);
+            ctx.lineTo(genX, genY);
+            ctx.stroke();
+
+            // 3. Generator
+            drawGear(genX, genY, 20, 8, mechState.gearAngle, '#fbbf24');
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(genX + 15, genY - 15, 40, 30);
+        }
+
+        // -- Environment --
+        // Ground Fill
+        ctx.fillStyle = '#374151'; // Road color
+        ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+        
+        // Road Marking
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([40, 60]);
+        ctx.beginPath();
+        ctx.moveTo(0, groundY + 90);
+        ctx.lineTo(canvas.width, groundY + 90);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // -- Vehicles --
+        vehicles.forEach(v => {
+            v.update();
+            v.draw(ctx);
+        });
+
+        // Cleanup
+        vehicles = vehicles.filter(v => v.x < canvas.width + 300);
+
+        // -- UI Updates --
+        valVoltage.textContent = physics.voltage.toFixed(2);
+        valEnergy.textContent = totalEnergy.toFixed(2);
+        valWeight.textContent = physics.activeLoad > 0 ? physics.activeLoad : "--";
+        valRPM.textContent = physics.rpm.toFixed(0);
+
+        requestAnimationFrame(draw);
+    }
+
+    // Start
+    draw();
+
+</script>
+</body>
+</html>
